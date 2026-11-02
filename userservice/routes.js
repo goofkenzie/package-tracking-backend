@@ -27,13 +27,16 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "password must be at least 6 characters" })
     }
 
+    /*Make sure that the registered email is not used before*/ 
     const check = await db.query("select * from users where email = $1", [email])
     if (check.rows.length > 0) {
        return res.status(400).json({ message: "email already used" })
     }
 
+    /* Encrypting the password */
     const hashed = await bcrypt.hash(password, 10)
 
+    /* Save data in DB */
     const result = await db.query(
       "insert into users (name, email, phone, password, role) values ($1, $2, $3, $4, 'user') returning id, name, email, phone, role",
       [name, email, phone, hashed]
@@ -70,9 +73,9 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, role: user.role },
+      { id: user.id, name: user.name, role: user.role }, /* data inside token */
       process.env.SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" } /* token lives for only 1 day */
     )
 
     res.json({

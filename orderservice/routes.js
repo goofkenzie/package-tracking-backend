@@ -5,6 +5,29 @@ const checktoken = require("./auth")
 const router = express.Router()
 
 
+
+/* get my orders */
+router.get("/", checktoken, async (req, res) => {
+  try {
+    if (req.user.role !== "user") {
+      return res.status(403).json({ message: "only users can view their orders" })
+    }
+
+    const result = await db.query(
+      "select * from orders where userid = $1",
+      [req.user.id]
+    )
+
+    res.json(result.rows)
+
+  } catch (err) {
+    console.log(err)
+    res.status(500).json({ message: "server error" })
+  }
+})
+
+
+
 // create order
 router.post("/", checktoken, async (req, res) => {
   try {
@@ -32,6 +55,53 @@ router.post("/", checktoken, async (req, res) => {
   } catch (err) {
      console.log(err)
      res.status(500).json({ message: "server error" })
+  }
+})
+
+
+router.get("/:id", checktoken, async (req, res) => {
+  try {
+    if (req.user.role !== "user") {
+      return res.status(403).json({ message: "only users can view their orders" })
+    }
+
+    const orderid = Number(req.params.id)
+    if (!Number.isInteger(orderid)) {
+      return res.status(400).json({ message: "order id is not valid" })
+    }
+
+    // the order must belong to the logged in user
+    const result = await db.query(
+      "select * from orders where id = $1 and userid = $2",
+      [orderid, req.user.id]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "order not found" })
+    }
+
+    const order = result.rows[0]
+    order.courier = null
+
+    // if a courier is assigned, add his name and phone
+    // (change courierid if your column has another name)
+    if (order.courierid) {
+      try {
+        const courier = await db.query(
+          "select name, phone from users where id = $1",
+          [order.courierid]
+        )
+        order.courier = courier.rows[0] || null
+      } catch (err) {
+        console.log("could not get courier:", err.message)
+      }
+    }
+
+    res.json(order)
+
+  } catch (err) {
+    console.log(err)
+    res.status(500).json({ message: "server error" })
   }
 })
 
